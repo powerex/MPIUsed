@@ -1,0 +1,104 @@
+/**
+* Copyright © 2011 Mathparca Ltd. All rights reserved.
+*/
+
+package com.mathpar.web;
+import freemarker.ext.beans.BeansWrapperBuilder;
+import freemarker.ext.beans.ResourceBundleModel;
+import freemarker.template.Configuration;
+import freemarker.template.Template;
+import freemarker.template.TemplateException;
+import freemarker.template.Version;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.Writer;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.ResourceBundle;
+
+/**
+ * Generates static HTML files from templates and l10n resource bundles.
+ *
+ * @author ivan
+ */
+public class HtmlGenerator {
+    public static final Version V = new Version(2, 3, 21);
+
+    /**
+     * Output dirs for each locale.
+     */
+    public static final String[] OUTPUT_PATHS = new String[]{
+            "src/main/webapp/en",
+            "src/main/webapp/ru", 
+            "src/main/webapp/ua",
+            "src/main/webapp/am",
+            "src/main/webapp/iw"
+    };
+    public static final Locale[] LOCALES = new Locale[]{
+            new Locale("en"),
+            new Locale("ru"),            
+            new Locale("ua"),
+            new Locale("am"),
+            new Locale("iw")   // with index = 4  see row 83 in this file
+    };
+    private static final String[] TEMPLATES = new String[]{
+            "index",
+            "welcome",
+            "contact"
+    };
+    private static final Logger LOG = LoggerFactory.getLogger(HtmlGenerator.class);
+
+    /**
+     * Render each template for each locale.
+     *
+     * @param args
+     */
+    public static void main(String[] args) {
+        Configuration cfg = new Configuration(V);
+        cfg.setClassForTemplateLoading(HtmlGenerator.class, "/templates");
+
+        for (int i = 0; i < LOCALES.length; i++) {
+            LOG.info("====== Using locale: " + LOCALES[i]);
+            ResourceBundle msg = ResourceBundle.getBundle("MessagesHtml", LOCALES[i]);
+            File outputDir = new File(OUTPUT_PATHS[i]);
+            if (!outputDir.exists()) {
+                outputDir.mkdirs();
+            }
+
+            for (String tplName : TEMPLATES) {
+                Map<String, Object> data = new HashMap<>();
+                data.put("_", new ResourceBundleModel(msg, new BeansWrapperBuilder(V).build()));
+                data.put("path_prefix", "../");
+                renderTemplate(cfg, tplName, data, outputDir, i);
+            }
+        }
+    }
+
+    private static void renderTemplate(Configuration cfg, String tplName,
+                                       Object data, File outputDir, int i) {
+        Writer fileWriter = null; 
+         // подменяем файл index  для иврита на index_iw
+        String nameFtl = (i==4)? tplName+"_iw.ftl": tplName+".ftl";
+        try {  
+            Template template = cfg.getTemplate(nameFtl);
+            fileWriter = new FileWriter(new File(outputDir, tplName + ".html"));
+            LOG.info("Generating: " + tplName + ".html");
+            template.process(data, fileWriter);
+            fileWriter.flush();
+        } catch (TemplateException | IOException e) {
+            e.printStackTrace(System.err);
+        } finally {
+            if (fileWriter != null) {
+                try {
+                    fileWriter.close();
+                } catch (IOException e2) {
+                    e2.printStackTrace(System.err);
+                }
+            }
+        }
+    }
+}
